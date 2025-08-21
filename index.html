@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>Time Tracking Web Punch-in & Punch-out</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" type="image/png"
+    href="https://static.vecteezy.com/system/resources/previews/028/754/456/non_2x/schedule-3d-icon-illustrations-png.png" />
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      background: #f4f4f4;
+    }
+
+    #main {
+      background: #fff;
+      max-width: 650px;
+      margin: 40px auto;
+      padding: 24px 18px;
+      border-radius: 8px;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.07);
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 34px;
+      border-bottom: 1px solid #eee;
+      padding-bottom: 10px;
+    }
+
+    .logo {
+      height: 44px;
+      width: max-content;
+      border-radius: 8px;
+      object-fit: cover;
+      margin-right: 12px;
+    }
+
+    .org-name {
+      font-size: 1.4em;
+      font-weight: bold;
+      color: #2980ef;
+      letter-spacing: 1px;
+      margin-right: 24px;
+    }
+
+    .login-btn {
+      padding: 8px 24px;
+      font-size: 15px;
+      border: none;
+      border-radius: 4px;
+      background: #2980ef;
+      color: #fff;
+      cursor: pointer;
+      margin-left: 18px;
+    }
+
+    .calendar {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 4px;
+      margin-top: 16px;
+      margin-bottom: 20px;
+    }
+
+    .cal-day,
+    .cal-label {
+      text-align: center;
+      padding: 7px 0;
+      font-size: 14px;
+      border-radius: 4px;
+      background: #f8fafc;
+    }
+
+    .cal-day {
+      background: #f8fafc;
+      min-width: 46px;
+      min-height: 46px;
+    }
+
+    .cal-day.punched {
+      background: #b9ecb4;
+      font-weight: bold;
+      /* border: 1.5px solid #2980ef; */
+      color: #254e11;
+    }
+
+    .cal-day.today {
+      border-color: #f39c12;
+      border-width: 2px;
+      border-style: solid;
+    }
+
+    .punchin-punchout-section {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .today-total-duration {
+      margin-left: 16px;
+      color: rgb #2980ef (41, 128, 239);
+      font-weight: bolder;
+      border: 2px solid rgb(41, 128, 239);
+      padding: 8px;
+      border-radius: 6px;
+      text-align: center;
+      font-family: monospace;
+    }
+
+    @media (max-width: 375px) {
+      .punchin-punchout-section {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .punchin-punchout-section button {
+        width: 100%;
+        margin-bottom: 8px;
+      }
+
+
+    }
+
+    .tab-switcher {
+      display: flex;
+      margin-bottom: 18px;
+    }
+
+    .calendar-navigation {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      gap: 8px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 16px;
+    }
+
+    th,
+    td {
+      padding: 8px;
+      border-bottom: 1px solid #ddd;
+      text-align: left;
+    }
+
+    tr:nth-child(even) {
+      background: #fafafa;
+    }
+
+    button {
+      padding: 10px 24px;
+      margin-right: 8px;
+      font-size: 15px;
+      border: none;
+      border-radius: 4px;
+      background: #2980ef;
+      color: #fff;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      background: #cccccc;
+      color: #666;
+      cursor: not-allowed;
+    }
+
+    h2,
+    h3 {
+      margin-top: 0;
+    }
+
+    .section {
+      margin-bottom: 30px;
+    }
+
+    @keyframes spin {
+      0% {
+        transform: rotate(0deg);
+      }
+
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+
+    .loader-spinner {
+      border: 6px solid #f3f3f3;
+      border-top: 6px solid #2980ef;
+      border-radius: 50%;
+      width: 48px;
+      height: 48px;
+      animation: spin 1s linear infinite;
+      margin-bottom: 18px;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="main"></div>
+
+  <!-- React & ReactDOM via CDN -->
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/axios@1.11.0/dist/axios.min.js"
+    integrity="sha256-BA81LP1os6XfLCoGGW8QArXABI+U4VNDWvhormFxWOk=" crossorigin="anonymous"></script>
+
+
+  <script>
+    const { useState, useEffect } = React;
+    const STORAGE_KEY = "time_tracking_records";
+    const LOGIN_KEY = "tt_is_logged_in";
+    const ORG_LOGO_URL = "https://content.influencemap.org//site/data/001/361/1361372.png";
+    const ORG_NAME = "";
+    const JSON_BIN_API_KEY = "$2a$10$ZCl3o52BK48oBD/JUsHaaOcGQgag1WB1K2mU4LQLMjLTNPpfAnpiW";
+
+    // const ATTENDANCE_URL = "https://api.npoint.io/fff96d0bdbf52cae9c38";
+    const ATTENDANCE_URL = "https://api.jsonbin.io/v3/b/68a6c59aae596e708fcfca55";
+
+    function fetchAttendanceData() {
+      return axios.get(ATTENDANCE_URL, {
+        headers: {
+          "X-Master-Key": JSON_BIN_API_KEY,
+          "Content-Type": "application/json"
+        }
+      })
+        .then(res => Array.isArray(res.data) ? res.data : (res.data.record.records || []))
+        .catch(() => []);
+    }
+
+    function saveAttendanceData(data) {
+      return axios.put(ATTENDANCE_URL,
+        { records: data },
+        {
+          headers: {
+            "X-Master-Key": JSON_BIN_API_KEY,
+            "Content-Type": "application/json"
+          }
+        })
+        .then((upData) =>
+          upData)
+        .catch(() => { });
+    }
+
+    function Calendar({ records, year, month }) {
+      const dayDurations = {};
+      records.forEach(r => {
+        if (r.punchIn && r.punchOut) {
+          const d = new Date(r.punchIn);
+          if (d.getFullYear() === year && d.getMonth() === month) {
+            const day = d.getDate();
+            const punchInDate = new Date(r.punchIn);
+            const punchOutDate = new Date(r.punchOut);
+            const diffMs = punchOutDate - punchInDate;
+            const hrs = Math.floor(diffMs / 3600000);
+            const mins = Math.floor((diffMs % 3600000) / 60000);
+            dayDurations[day] = `${hrs}h ${mins}m`;
+          }
+        }
+      });
+
+      const punchDays = new Set(records
+        .filter(r => !!r.punchIn)
+        .map(r => {
+          const d = new Date(r.punchIn);
+          return [d.getFullYear(), d.getMonth(), d.getDate()].join("-");
+        })
+      );
+      const today = new Date();
+      const firstDay = new Date(year, month, 1);
+      const startDayOfWeek = firstDay.getDay();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      const weekLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+      let dayCells = [];
+      for (let i = 0; i < startDayOfWeek; i++) {
+        dayCells.push(React.createElement('div', { className: 'cal-day', key: 'empty-' + i }));
+      }
+      for (let d = 1; d <= daysInMonth; d++) {
+        const id = [year, month, d].join("-");
+        const punched = punchDays.has(id);
+        const isToday = (
+          d === today.getDate() &&
+          month === today.getMonth() &&
+          year === today.getFullYear()
+        );
+        let cls = 'cal-day';
+        if (punched) cls += ' punched';
+        if (isToday) cls += ' today';
+
+        dayCells.push(
+          React.createElement('div', { className: cls, key: 'day-' + d },
+            React.createElement('div', null, d),
+            dayDurations[d] &&
+            React.createElement('div', { style: { fontSize: '12px', color: '#2980ef', marginTop: '2px' } }, dayDurations[d])
+          )
+        );
+      }
+      return React.createElement('div', { className: 'section' },
+        React.createElement('h3', null, 'Punch Calendar'),
+        React.createElement('div', { className: 'calendar' },
+          ...weekLabels.map(dayLabel =>
+            React.createElement('div', { className: 'cal-label', key: dayLabel }, dayLabel)
+          ),
+          ...dayCells
+        )
+      );
+    }
+
+    function LoginHeader({ isLoggedIn, onLoginLogout }) {
+      return (
+        React.createElement('header', null,
+          React.createElement('div', { style: { display: 'flex', alignItems: 'center' } },
+            React.createElement('img', {
+              // src: `data:image/jpeg;base64, ${ORG_LOGO_URL}`,
+              src: `${ORG_LOGO_URL}`,
+              alt: 'Logo',
+              className: 'logo'
+            }),
+            React.createElement('span', { className: 'org-name' }, ORG_NAME)
+          ),
+          React.createElement('button', {
+            className: 'login-btn',
+            onClick: onLoginLogout
+          }, isLoggedIn ? 'Logout' : 'Login')
+        )
+      );
+    }
+
+    function TimeTrackerApp() {
+      const [records, setRecords] = useState([]);
+      const [isPunchedIn, setIsPunchedIn] = useState(false);
+      const [isLoggedIn, setIsLoggedIn] = useState(false);
+      const [loading, setLoading] = useState(true);
+      const [elapsed, setElapsed] = useState("");
+      const [activeTab, setActiveTab] = useState('attendance');
+      const [expandedMonths, setExpandedMonths] = useState({});
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = now.getMonth();
+      const [calendarYear, setCalendarYear] = useState(year);
+      const [calendarMonth, setCalendarMonth] = useState(month);
+
+      useEffect(() => {
+        if (isLoggedIn) {
+          setLoading(true);
+          fetchAttendanceData()
+            .then(data => {
+              setRecords(data);
+              setLoading(false);
+            })
+            .catch(() => setLoading(false));
+        }
+      }, [isLoggedIn]);
+
+      useEffect(() => {
+        if (records.length > 0) {
+          const last = records[records.length - 1];
+          setIsPunchedIn(!last.punchOut);
+        }
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+      }, [records]);
+
+      function handlePrevMonth() {
+        setCalendarMonth(prev => {
+          if (prev === 0) {
+            setCalendarYear(y => y - 1);
+            return 11;
+          }
+          return prev - 1;
+        });
+      }
+
+      function handleNextMonth() {
+        setCalendarMonth(prev => {
+          if (prev === 11) {
+            setCalendarYear(y => y + 1);
+            return 0;
+          }
+          return prev + 1;
+        });
+      }
+
+      useEffect(() => {
+        const timer = setTimeout(() => setLoading(false), 1000);
+        return () => clearTimeout(timer);
+      }, []);
+
+      useEffect(() => {
+        const logined = localStorage.getItem(LOGIN_KEY) === '1';
+        setIsLoggedIn(logined);
+      }, []);
+
+      function handleLoginLogout() {
+        if (isLoggedIn) {
+          localStorage.setItem(LOGIN_KEY, '0');
+          setIsLoggedIn(false);
+        } else {
+          setLoading(true);
+          setTimeout(() => {
+            localStorage.setItem(LOGIN_KEY, '1');
+            setIsLoggedIn(true);
+            setLoading(false);
+          }, 2000);
+        }
+      }
+
+      function handlePunchIn() {
+        if (!isPunchedIn && isLoggedIn) {
+          const now = new Date();
+          setRecords([...records, { punchIn: now.toISOString(), punchOut: null }]);
+          setIsPunchedIn(true);
+        }
+      }
+
+      function handlePunchOut() {
+        if (isPunchedIn && isLoggedIn) {
+          const now = new Date();
+          const updatedRecords = [...records];
+          updatedRecords[updatedRecords.length - 1].punchOut = now.toISOString();
+          setRecords(updatedRecords);
+          setIsPunchedIn(false);
+          saveAttendanceData(updatedRecords);
+        }
+      }
+
+      function getRecordsByMonth() {
+        const groups = {};
+        records.forEach(rec => {
+          const d = new Date(rec.punchIn);
+          const key = `${d.getFullYear()}-${d.getMonth() + 1}`;
+          if (!groups[key]) groups[key] = [];
+          groups[key].push(rec);
+        });
+        return groups;
+      }
+
+      function toggleMonth(monthKey) {
+        setExpandedMonths(prev => ({
+          ...prev,
+          [monthKey]: !prev[monthKey]
+        }));
+      }
+
+      function renderRows(monthRecords) {
+        return monthRecords.map((rec, idx) => {
+          const punchInDate = new Date(rec.punchIn);
+          const punchOutDate = rec.punchOut ? new Date(rec.punchOut) : null;
+          let duration = "-";
+          if (punchOutDate) {
+            const diffMs = punchOutDate - punchInDate;
+            const hrs = Math.floor(diffMs / 3600000);
+            const mins = Math.floor((diffMs % 3600000) / 60000);
+            duration = `${hrs}h ${mins}m`;
+          }
+          return (
+            React.createElement('tr', { key: idx },
+              React.createElement('td', null, punchInDate.toLocaleString()),
+              React.createElement('td', null, punchOutDate ? punchOutDate.toLocaleString() : "-"),
+              React.createElement('td', null, duration)
+            )
+          );
+        });
+      }
+
+      function isTodayPunchedOut() {
+        const today = new Date();
+        return records.some(rec => {
+          const punchInDate = new Date(rec.punchIn);
+          const punchOutDate = rec.punchOut ? new Date(rec.punchOut) : null;
+          return (
+            punchInDate.getFullYear() === today.getFullYear() &&
+            punchInDate.getMonth() === today.getMonth() &&
+            punchInDate.getDate() === today.getDate() &&
+            punchOutDate &&
+            punchOutDate.getFullYear() === today.getFullYear() &&
+            punchOutDate.getMonth() === today.getMonth() &&
+            punchOutDate.getDate() === today.getDate()
+          );
+        });
+      }
+
+      function getTodayRecord() {
+        const today = new Date();
+        return records.find(rec => {
+          const punchInDate = new Date(rec.punchIn);
+          return (
+            punchInDate.getFullYear() === today.getFullYear() &&
+            punchInDate.getMonth() === today.getMonth() &&
+            punchInDate.getDate() === today.getDate()
+          );
+        });
+      }
+
+      useEffect(() => {
+        let timer;
+        const todayRec = getTodayRecord();
+        if (isLoggedIn && isPunchedIn && todayRec && todayRec.punchIn && !todayRec.punchOut) {
+          timer = setInterval(() => {
+            const now = new Date();
+            const punchInDate = new Date(todayRec.punchIn);
+            const diffMs = now - punchInDate;
+            const hrs = Math.floor(diffMs / 3600000);
+            const mins = Math.floor((diffMs % 3600000) / 60000);
+            const secs = Math.floor((diffMs % 60000) / 1000);
+            setElapsed(`${hrs}h ${mins}m ${secs}s`);
+          }, 1000);
+        } else {
+          setElapsed("");
+        }
+        return () => timer && clearInterval(timer);
+      }, [isLoggedIn, isPunchedIn, records]);
+
+      function getTodayDuration() {
+        const todayRec = getTodayRecord();
+        if (todayRec && todayRec.punchIn && todayRec.punchOut) {
+          const punchInDate = new Date(todayRec.punchIn);
+          const punchOutDate = new Date(todayRec.punchOut);
+          const diffMs = punchOutDate - punchInDate;
+          const hrs = Math.floor(diffMs / 3600000);
+          const mins = Math.floor((diffMs % 3600000) / 60000);
+          const secs = Math.floor((diffMs % 60000) / 1000);
+          return `${hrs}h ${mins}m ${secs}s`;
+        }
+        return "";
+      }
+
+      if (loading) {
+        return React.createElement('div', { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', fontSize: '1.3em', color: '#2980ef' } },
+          React.createElement('div', { className: 'loader-spinner' }),
+          'Loading...'
+        );
+      }
+
+      return (
+        React.createElement('div', null,
+          React.createElement(LoginHeader, {
+            isLoggedIn, onLoginLogout: handleLoginLogout
+          }),
+          !isLoggedIn
+            ? React.createElement('img', { src: `${ORG_LOGO_URL}`, alt: 'Logo', className: 'logo' })
+            : React.createElement(React.Fragment, null,
+              React.createElement('div', { className: 'tab-switcher' },
+                React.createElement('button', {
+                  style: {
+                    flex: 1,
+                    padding: '10px 0',
+                    background: activeTab === 'attendance' ? '#2980ef' : '#f8fafc',
+                    color: activeTab === 'attendance' ? '#fff' : '#2980ef',
+                    border: 'none',
+                    borderRadius: '8px 0 0 8px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer'
+                  },
+                  onClick: () => setActiveTab('attendance')
+                }, 'Attendance'),
+                React.createElement('button', {
+                  style: {
+                    flex: 1,
+                    padding: '10px 0',
+                    background: activeTab === 'records' ? '#2980ef' : '#f8fafc',
+                    color: activeTab === 'records' ? '#fff' : '#2980ef',
+                    border: 'none',
+                    borderRadius: '0 8px 8px 0',
+                    fontWeight: 'bold',
+                    cursor: 'pointer'
+                  },
+                  onClick: () => setActiveTab('records')
+                }, 'Records')
+              ),
+              activeTab === 'attendance' && React.createElement('div', null,
+                React.createElement('div', { className: 'section' },
+                  React.createElement('h2', null, 'Time Tracking Web Punch-in & Punch-out'),
+                  React.createElement('div', { className: 'punchin-punchout-section' },
+                    React.createElement('button', {
+                      onClick: handlePunchIn,
+                      disabled: !isLoggedIn || isPunchedIn || isTodayPunchedOut()
+                    }, isPunchedIn ? "Punched In" : "Punch In"),
+                    isLoggedIn && isPunchedIn && elapsed &&
+                    React.createElement('span', { className: 'today-total-duration' },
+                      `Elapsed: ${elapsed}`
+                    ),
+                    isLoggedIn && !isPunchedIn && getTodayDuration() &&
+                    React.createElement('span', { className: 'today-total-duration' },
+                      `Today: ${getTodayDuration()}`
+                    ),
+                    React.createElement('button', {
+                      onClick: handlePunchOut,
+                      disabled: !isLoggedIn || !isPunchedIn
+                    }, !isPunchedIn ? "Punch Out Disabled" : "Punch Out"),
+                  )
+                ),
+                React.createElement('div', { className: "calendar-navigation" },
+                  React.createElement('button', {
+                    style: { padding: '4px 12px', fontSize: '15px', borderRadius: '4px', background: '#f8fafc', color: '#2980ef', border: '1px solid #eee', cursor: 'pointer' },
+                    onClick: handlePrevMonth
+                  }, '← Prev'),
+                  React.createElement('span', { style: { fontWeight: 'bold', fontSize: '16px', color: '#2980ef' } },
+                    new Date(calendarYear, calendarMonth).toLocaleString('default', { month: 'long', year: 'numeric' })
+                  ),
+                  React.createElement('button', {
+                    style: { padding: '4px 12px', fontSize: '15px', borderRadius: '4px', background: '#f8fafc', color: '#2980ef', border: '1px solid #eee', cursor: 'pointer' },
+                    onClick: handleNextMonth
+                  }, 'Next →')
+                ),
+                React.createElement(Calendar, {
+                  records, year: calendarYear, month: calendarMonth
+                })
+              ),
+              activeTab === 'records' && React.createElement('div', {
+                className: 'section',
+                style: {
+                  maxHeight: '70vh',
+                  overflowY: 'auto',
+                  border: '1px solid #eee',
+                  borderRadius: '8px',
+                  background: '#fff',
+                  padding: '12px'
+                }
+              },
+                React.createElement('h3', null, 'Records'),
+                (() => {
+                  const recordsByMonth = getRecordsByMonth();
+                  const monthKeys = Object.keys(recordsByMonth).sort((a, b) => b.localeCompare(a));
+                  return monthKeys.map(monthKey => {
+                    const [y, m] = monthKey.split('-');
+                    const monthName = new Date(y, m - 1).toLocaleString('default', { month: 'long', year: 'numeric' });
+                    const expanded = expandedMonths[monthKey] ?? monthKey === `${year}-${month + 1}`;
+                    return React.createElement('div', { key: monthKey, style: { marginBottom: '10px' } },
+                      React.createElement('div', {
+                        style: {
+                          cursor: 'pointer',
+                          background: '#f8fafc',
+                          padding: '8px',
+                          borderRadius: '6px',
+                          fontWeight: 'bold',
+                          color: '#2980ef',
+                          border: '1px solid #e0e0e0'
+                        },
+                        onClick: () => toggleMonth(monthKey)
+                      }, monthName, ' ', expanded ? '▼' : '▶'),
+                      expanded && React.createElement('table', { style: { width: '100%', marginTop: '8px' } },
+                        React.createElement('thead', null,
+                          React.createElement('tr', null,
+                            React.createElement('th', null, 'Punch In'),
+                            React.createElement('th', null, 'Punch Out'),
+                            React.createElement('th', null, 'Duration')
+                          )
+                        ),
+                        React.createElement('tbody', null, renderRows(recordsByMonth[monthKey]))
+                      )
+                    );
+                  });
+                })()
+              )
+            )
+        )
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('main')).render(
+      React.createElement(TimeTrackerApp)
+    );
+  </script>
+</body>
+
+</html>
