@@ -416,8 +416,10 @@
       function handlePunchIn() {
         if (!isPunchedIn && isLoggedIn) {
           const now = new Date();
-          setRecords([...records, { punchIn: now.toISOString(), punchOut: null }]);
+          const updatedRecords = [...records, { punchIn: now.toISOString(), punchOut: null }];
+          setRecords(updatedRecords);
           setIsPunchedIn(true);
+          saveAttendanceData(updatedRecords);
         }
       }
 
@@ -671,5 +673,6 @@
     );
   </script>
 </body>
+
 
 </html>
